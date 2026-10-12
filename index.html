@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Water Eject">
+<meta name="theme-color" content="#0a84c6">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="icon" type="image/png" href="icons/icon-192.png">
+<link rel="manifest" href="manifest.webmanifest">
+<title>Water Eject</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700&family=Figtree:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;user-select:none;-webkit-user-select:none}
+/* Layout: one-screen phone app — readout, big eject dial, mode chips, tips */
+:root{
+  --bg:#eef5f8; --surface:#ffffff; --fg:#0c2430; --muted:#5a7480;
+  --line:#cfe0e7; --accent:#0a84c6; --accent-2:#3fc1e8; --glow:rgba(10,132,198,.18);
+  --warn:#b4560b;
+  --display:"Unbounded",system-ui,sans-serif;
+  --body:"Figtree",system-ui,-apple-system,sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#06141b; --surface:#0d222c; --fg:#e4f3f8; --muted:#86a3ae;
+  --line:#1c3a47; --accent:#38b6ef; --accent-2:#7fe0ff; --glow:rgba(56,182,239,.22);
+  --warn:#f0a35c; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#06141b; --surface:#0d222c; --fg:#e4f3f8; --muted:#86a3ae;
+  --line:#1c3a47; --accent:#38b6ef; --accent-2:#7fe0ff; --glow:rgba(56,182,239,.22);
+  --warn:#f0a35c; color-scheme:dark}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:15px;line-height:1.5;
+  padding-inline:16px;padding-block:20px 28px;-webkit-tap-highlight-color:transparent}
+.app{max-width:420px;margin:0 auto;display:flex;flex-direction:column;gap:22px;min-height:100%}
+header{display:flex;justify-content:space-between;align-items:baseline;gap:12px}
+h1{font-family:var(--display);font-weight:700;font-size:22px;letter-spacing:-.01em;margin:0}
+.status{font-family:var(--mono);font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+.status.on{color:var(--accent)}
+
+.readout{display:flex;justify-content:center;align-items:baseline;gap:6px;font-variant-numeric:tabular-nums}
+.hz{font-family:var(--display);font-weight:500;font-size:56px;line-height:1;letter-spacing:-.03em}
+.unit{font-family:var(--mono);color:var(--muted);font-size:16px}
+
+.stage{position:relative;width:100%;max-width:300px;aspect-ratio:1;margin:0 auto}
+canvas{position:absolute;inset:0;width:100%;height:100%}
+.dial{position:absolute;inset:16%;border-radius:50%;border:0;cursor:pointer;
+  background:radial-gradient(circle at 35% 30%,var(--accent-2),var(--accent) 70%);
+  color:#fff;font-family:var(--display);font-weight:700;font-size:20px;letter-spacing:.02em;
+  box-shadow:0 18px 40px var(--glow),inset 0 -8px 20px rgba(0,0,0,.15);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;
+  transition:transform .15s ease}
+.dial:active{transform:scale(.97)}
+.dial:focus-visible{outline:3px solid var(--fg);outline-offset:6px}
+.dial small{font-family:var(--mono);font-weight:500;font-size:12px;opacity:.85;letter-spacing:.06em}
+.dial svg{width:34px;height:34px}
+
+.progress{height:6px;background:var(--line);border-radius:3px;overflow:hidden}
+.progress i{display:block;height:100%;width:0;background:var(--accent);transition:width .25s linear}
+
+.group{display:flex;flex-direction:column;gap:10px}
+.label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.1em;color:var(--muted)}
+.chips{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.chip{appearance:none;border:1px solid var(--line);background:var(--surface);color:var(--fg);
+  border-radius:12px;padding:10px 6px;font:600 14px var(--body);cursor:pointer;display:flex;flex-direction:column;gap:2px;align-items:center}
+.chip span{font:500 11px var(--mono);color:var(--muted)}
+.chip[aria-pressed="true"]{border-color:var(--accent);background:var(--glow)}
+.chip[aria-pressed="true"] span{color:var(--accent)}
+.chip:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+.tips{margin:0;padding:16px 16px 16px 34px;background:var(--surface);border:1px solid var(--line);border-radius:14px;
+  display:flex;flex-direction:column;gap:6px;color:var(--muted);font-size:14px}
+.tips b{color:var(--fg);font-weight:600}
+.note{font-size:12px;color:var(--muted);text-align:center;margin:0}
+@media (prefers-reduced-motion:reduce){.dial,.progress i{transition:none}}
+</style>
+
+</head>
+<body>
+<main class="app">
+  <header>
+    <h1>Water Eject</h1>
+    <span class="status" id="status">Ready</span>
+  </header>
+
+  <div class="readout"><span class="hz" id="hz">165</span><span class="unit">Hz</span></div>
+
+  <div class="stage">
+    <canvas id="fx"></canvas>
+    <button class="dial" id="dial" aria-label="Start water eject">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3s6 6.5 6 11a6 6 0 0 1-12 0c0-4.5 6-11 6-11z"/></svg>
+      <span id="dialText">Eject</span>
+      <small id="dialSub">30 s</small>
+    </button>
+  </div>
+
+  <div class="progress" aria-hidden="true"><i id="bar"></i></div>
+
+  <div class="group">
+    <div class="label">Mode</div>
+    <div class="chips" id="modes">
+      <button class="chip" data-mode="tone" aria-pressed="true">Tone<span>165 Hz</span></button>
+      <button class="chip" data-mode="sweep" aria-pressed="false">Sweep<span>120–300</span></button>
+      <button class="chip" data-mode="pulse" aria-pressed="false">Pulse<span>165 · 4/s</span></button>
+    </div>
+  </div>
+
+  <div class="group">
+    <div class="label">Duration</div>
+    <div class="chips" id="durs">
+      <button class="chip" data-dur="15" aria-pressed="false">15 s<span>quick</span></button>
+      <button class="chip" data-dur="30" aria-pressed="true">30 s<span>standard</span></button>
+      <button class="chip" data-dur="60" aria-pressed="false">60 s<span>soaked</span></button>
+    </div>
+  </div>
+
+  <ol class="tips">
+    <li><b>Turn off Silent Mode</b> and set volume to max.</li>
+    <li><b>Hold the phone speaker-down</b> so water can drip out.</li>
+    <li>Run it two or three times if the sound is still muffled.</li>
+  </ol>
+  <p class="note">Uses the same low-frequency trick as Apple Watch water lock. Not a fix for internal water damage.</p>
+</main>
+
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const dial = $('dial'), hzEl = $('hz'), bar = $('bar'), statusEl = $('status');
+  const dialText = $('dialText'), dialSub = $('dialSub');
+  let mode = 'tone', dur = 30;
+  let ctx = null, osc = null, gain = null, lfo = null, lfoGain = null;
+  let running = false, startT = 0, raf = 0;
+
+  // Option chips
+  function wire(groupId, attr, set) {
+    $(groupId).addEventListener('click', e => {
+      const b = e.target.closest('.chip'); if (!b || running) return;
+      [...$(groupId).children].forEach(c => c.setAttribute('aria-pressed', c === b));
+      set(b.dataset[attr]);
+    });
+  }
+  wire('modes', 'mode', v => { mode = v; hzEl.textContent = v === 'sweep' ? '120' : '165'; });
+  wire('durs', 'dur', v => { dur = +v; dialSub.textContent = dur + ' s'; });
+
+  function start() {
+    ctx = ctx || new (window.AudioContext || window.webkitAudioContext)();
+    if (ctx.state === 'suspended') ctx.resume();
+    const t = ctx.currentTime;
+    osc = ctx.createOscillator(); osc.type = 'sine';
+    gain = ctx.createGain(); gain.gain.setValueAtTime(0, t);
+    gain.gain.linearRampToValueAtTime(1, t + 0.15);
+    osc.connect(gain).connect(ctx.destination);
+
+    if (mode === 'tone' || mode === 'pulse') osc.frequency.setValueAtTime(165, t);
+    if (mode === 'sweep') {
+      // Repeated rises 120 → 300 Hz, 2 s each
+      for (let s = 0; s < dur; s += 2) {
+        osc.frequency.setValueAtTime(120, t + s);
+        osc.frequency.linearRampToValueAtTime(300, t + s + 2);
+      }
+    }
+    if (mode === 'pulse') {
+      // Square LFO gates the volume 4 times a second
+      lfo = ctx.createOscillator(); lfo.type = 'square'; lfo.frequency.value = 4;
+      lfoGain = ctx.createGain(); lfoGain.gain.value = 0.5;
+      gain.gain.cancelScheduledValues(t); gain.gain.value = 0.5;
+      lfo.connect(lfoGain).connect(gain.gain); lfo.start(t);
+    }
+    osc.start(t);
+    osc.stop(t + dur + 0.2);
+    osc.onended = () => { if (running) stop(true); };
+
+    running = true; startT = performance.now();
+    dial.setAttribute('aria-label', 'Stop water eject');
+    dialText.textContent = 'Stop';
+    statusEl.textContent = 'Ejecting'; statusEl.classList.add('on');
+    try { navigator.wakeLock && navigator.wakeLock.request('screen').catch(() => {}); } catch (e) {}
+    tick();
+  }
+
+  function stop(done) {
+    running = false;
+    if (gain && ctx) { const t = ctx.currentTime; gain.gain.cancelScheduledValues(t); gain.gain.setTargetAtTime(0, t, 0.03); }
+    try { osc && osc.stop(ctx.currentTime + 0.12); } catch (e) {}
+    try { lfo && lfo.stop(ctx.currentTime + 0.12); } catch (e) {}
+    osc = lfo = null;
+    dial.setAttribute('aria-label', 'Start water eject');
+    dialText.textContent = done ? 'Again' : 'Eject';
+    dialSub.textContent = dur + ' s';
+    statusEl.textContent = done ? 'Done' : 'Stopped'; statusEl.classList.remove('on');
+    hzEl.textContent = mode === 'sweep' ? '120' : '165';
+    bar.style.width = done ? '100%' : '0';
+  }
+
+  dial.addEventListener('click', () => running ? stop(false) : start());
+
+  function tick() {
+    if (!running) return;
+    const el = (performance.now() - startT) / 1000;
+    bar.style.width = Math.min(100, el / dur * 100) + '%';
+    dialSub.textContent = Math.max(0, Math.ceil(dur - el)) + ' s left';
+    if (mode === 'sweep') hzEl.textContent = Math.round(120 + 180 * ((el % 2) / 2));
+    raf = requestAnimationFrame(tick);
+  }
+
+  // Ripples + droplets
+  const cv = $('fx'), g = cv.getContext('2d');
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let W = 0, drops = [], rings = [], lastRing = 0;
+  function size() { const r = cv.getBoundingClientRect(), d = devicePixelRatio || 1; W = r.width; cv.width = W * d; cv.height = W * d; g.setTransform(d, 0, 0, d, 0, 0); }
+  addEventListener('resize', size); size();
+  const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  function draw(now) {
+    g.clearRect(0, 0, W, W);
+    const c = W / 2, R = W * 0.34, col = css('--accent');
+    g.strokeStyle = col; g.fillStyle = col;
+    // resting ring
+    g.globalAlpha = .25; g.lineWidth = 1.5; g.beginPath(); g.arc(c, c, R + 10, 0, 7); g.stroke();
+    if (running && !reduce) {
+      if (now - lastRing > 380) { rings.push(0); lastRing = now; }
+      for (let i = 0; i < 3; i++) if (Math.random() < .5) {
+        const a = Math.random() * 6.283;
+        drops.push({ x: c + Math.cos(a) * R, y: c + Math.sin(a) * R, vx: Math.cos(a) * 1.4, vy: Math.sin(a) * 1.4 - .6, r: 1.5 + Math.random() * 2.5, life: 1 });
+      }
+    }
+    rings = rings.filter(p => p < 1);
+    rings.forEach((p, i) => { g.globalAlpha = (1 - p) * .5; g.lineWidth = 2; g.beginPath(); g.arc(c, c, R + p * (W / 2 - R), 0, 7); g.stroke(); rings[i] = p + .012; });
+    drops = drops.filter(d => d.life > 0);
+    drops.forEach(d => { d.x += d.vx; d.y += d.vy; d.vy += .06; d.life -= .018; g.globalAlpha = Math.max(0, d.life); g.beginPath(); g.arc(d.x, d.y, d.r, 0, 7); g.fill(); });
+    g.globalAlpha = 1;
+    requestAnimationFrame(draw);
+  }
+  requestAnimationFrame(draw);
+})();
+
+if ('serviceWorker' in navigator) {
+  addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+}
+</script>
+
+</body>
+</html>
