@@ -1,5 +1,5 @@
 // Caches the app so it opens offline after the first launch.
-const CACHE = 'water-eject-v1';
+const CACHE = 'water-eject-v2';
 const FILES = [
   './',
   './index.html',

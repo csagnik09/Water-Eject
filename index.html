@@ -75,6 +75,13 @@ canvas{position:absolute;inset:0;width:100%;height:100%}
 .chip[aria-pressed="true"] span{color:var(--accent)}
 .chip:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 
+#modes{grid-template-columns:repeat(2,1fr)}
+.pitch-head{display:flex;justify-content:space-between;align-items:baseline}
+.pitch-val{font:500 13px var(--mono);color:var(--accent);font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;accent-color:var(--accent);height:28px;margin:0}
+.presets{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.presets .chip{padding:8px 4px;font-size:13px}
+.hint{margin:0;font-size:12px;color:var(--warn)}
 .tips{margin:0;padding:16px 16px 16px 34px;background:var(--surface);border:1px solid var(--line);border-radius:14px;
   display:flex;flex-direction:column;gap:6px;color:var(--muted);font-size:14px}
 .tips b{color:var(--fg);font-weight:600}
@@ -109,7 +116,20 @@ canvas{position:absolute;inset:0;width:100%;height:100%}
       <button class="chip" data-mode="tone" aria-pressed="true">Tone<span>165 Hz</span></button>
       <button class="chip" data-mode="sweep" aria-pressed="false">Sweep<span>120–300</span></button>
       <button class="chip" data-mode="pulse" aria-pressed="false">Pulse<span>165 · 4/s</span></button>
+      <button class="chip" data-mode="high" aria-pressed="false">High<span id="highChip">2000 Hz</span></button>
     </div>
+  </div>
+
+  <div class="group" id="pitchGroup" hidden>
+    <div class="pitch-head"><label class="label" for="pitch">High pitch</label><span class="pitch-val" id="pitchVal">2000 Hz</span></div>
+    <input type="range" id="pitch" min="800" max="8000" step="50" value="2000">
+    <div class="presets" id="presets">
+      <button class="chip" data-hz="1000">1 kHz</button>
+      <button class="chip" data-hz="2000">2 kHz</button>
+      <button class="chip" data-hz="4000">4 kHz</button>
+      <button class="chip" data-hz="6000">6 kHz</button>
+    </div>
+    <p class="hint">High tones are piercing at full volume. Keep the phone away from your ears.</p>
   </div>
 
   <div class="group">
@@ -142,11 +162,25 @@ canvas{position:absolute;inset:0;width:100%;height:100%}
   function wire(groupId, attr, set) {
     $(groupId).addEventListener('click', e => {
       const b = e.target.closest('.chip'); if (!b || running) return;
+      if (b.getAttribute('aria-pressed') === 'true') return;
       [...$(groupId).children].forEach(c => c.setAttribute('aria-pressed', c === b));
       set(b.dataset[attr]);
     });
   }
-  wire('modes', 'mode', v => { mode = v; hzEl.textContent = v === 'sweep' ? '120' : '165'; });
+  let highHz = 2000;
+  const restHz = () => mode === 'sweep' ? 120 : mode === 'high' ? highHz : 165;
+  wire('modes', 'mode', v => { mode = v; hzEl.textContent = restHz(); $('pitchGroup').hidden = v !== 'high'; });
+
+  // High-pitch control: works live while the tone plays
+  function setHigh(hz) {
+    highHz = +hz;
+    $('pitch').value = highHz;
+    $('pitchVal').textContent = $('highChip').textContent = highHz + ' Hz';
+    if (mode === 'high') hzEl.textContent = highHz;
+    if (running && mode === 'high' && osc) osc.frequency.setTargetAtTime(highHz, ctx.currentTime, 0.02);
+  }
+  $('pitch').addEventListener('input', e => setHigh(e.target.value));
+  $('presets').addEventListener('click', e => { const b = e.target.closest('.chip'); if (b) setHigh(b.dataset.hz); });
   wire('durs', 'dur', v => { dur = +v; dialSub.textContent = dur + ' s'; });
 
   function start() {
@@ -159,6 +193,7 @@ canvas{position:absolute;inset:0;width:100%;height:100%}
     osc.connect(gain).connect(ctx.destination);
 
     if (mode === 'tone' || mode === 'pulse') osc.frequency.setValueAtTime(165, t);
+    if (mode === 'high') osc.frequency.setValueAtTime(highHz, t);
     if (mode === 'sweep') {
       // Repeated rises 120 → 300 Hz, 2 s each
       for (let s = 0; s < dur; s += 2) {
@@ -195,7 +230,7 @@ canvas{position:absolute;inset:0;width:100%;height:100%}
     dialText.textContent = done ? 'Again' : 'Eject';
     dialSub.textContent = dur + ' s';
     statusEl.textContent = done ? 'Done' : 'Stopped'; statusEl.classList.remove('on');
-    hzEl.textContent = mode === 'sweep' ? '120' : '165';
+    hzEl.textContent = restHz();
     bar.style.width = done ? '100%' : '0';
   }
 
